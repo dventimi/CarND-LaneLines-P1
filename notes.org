@@ -1,0 +1,7 @@
+* Tools
+*** Color Selection
+*** Region Masking
+*** Grayscale
+*** Gaussian Blur
+*** Canny Edge Detection
+*** Hough Transform
