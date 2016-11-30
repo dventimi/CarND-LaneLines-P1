@@ -12,7 +12,7 @@ high_threshold = 150
 rho = 1
 theta = np.pi/180
 threshold = 1
-min_line_length = 10
+min_line_length = 1
 max_line_gap = 1
 
 image = mpimg.imread('test_images/solidWhiteRight.jpg')
