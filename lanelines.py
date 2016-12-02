@@ -1,6 +1,7 @@
 from IPython.display import HTML
 from moviepy.editor import VideoFileClip
 import cv2
+import glob
 import math
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
@@ -8,7 +9,6 @@ import numpy as np
 import os
 import pdb
 import util
-import glob
 
 top = lambda img: 0
 bottom = lambda img: img.shape[0]
@@ -35,16 +35,6 @@ road = lambda img:  np.array([[[horizon(img), centerline(img)-0.10*width(img)/2]
 y = lambda x,m,b: m*x+b
 x = lambda y,m,b: (y-b)/m
 
-# def y(x,m,b):
-#     if math.isnan(x) or math.isnan(m) or math.isnan(b):
-#         pdb.set_trace()
-#     return m*x+b
-
-# def x(y,m,b):
-#     if math.isnan(y) or math.isnan(m) or math.isnan(b):
-#         pdb.set_trace()
-#     return (y-b)/m
-
 roadline_pts = lambda img,m,b: ((int(x(bottom(img),m,b)), bottom(img)),
                                 (int(x(horizon(img),m,b)), horizon(img)))
 slope = lambda lines:  (lines[:,0,3]-lines[:,0,1])/(lines[:,0,2]-lines[:,0,0])
@@ -65,8 +55,6 @@ def process_image(img0, kernel_size=5, low_threshold=50, high_threshold=150, rho
     b = intercept(lines, m)
     mbar = [np.mean(m[lidx(m)]), np.mean(m[ridx(m)])]
     bbar = [np.mean(b[lidx(m)]), np.mean(b[ridx(m)])]
-    if math.isnan(mbar[0]):
-        pdb.set_trace()
     l_pts = roadline_pts(img0, mbar[0], bbar[0])
     r_pts = roadline_pts(img0, mbar[1], bbar[1])
     cv2.line(img7, l_pts[0], l_pts[1], (0, 255, 0), 5)
