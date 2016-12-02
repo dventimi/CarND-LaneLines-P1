@@ -29,10 +29,10 @@ road = lambda img:  np.array([[[horizon(img), centerline(img)-0.10*width(img)/2]
                                [bottom(img), centerline(img)+0.95*width(img)/2],
                                [bottom(img), centerline(img)-0.95*width(img)/2]]]).astype(int)
 
-y = lambda x,m,b: int(m*x+b)
-x = lambda y,m,b: int((y-b)/m)
-groundline_pts = lambda img,m,b: ((x(bottom(img),m,b), bottom(img)),
-                                  (x(horizon(img),m,b), horizon(img)))
+y = lambda x,m,b: m*x+b
+x = lambda y,m,b: (y-b)/m
+roadline_pts = lambda img,m,b: ((int(x(bottom(img),m,b)), bottom(img)),
+                                (int(x(horizon(img),m,b)), horizon(img)))
 slope = lambda lines:  (lines[:,0,3]-lines[:,0,1])/(lines[:,0,2]-lines[:,0,0])
 weight = lambda lines:  np.sqrt((lines[:,0,2]-lines[:,0,0])**2+(lines[:,0,3]-lines[:,0,1])**2)
 intercept = lambda lines, m:  lines[:,0,1]-m*lines[:,0,0]
@@ -40,7 +40,7 @@ intercept = lambda lines, m:  lines[:,0,1]-m*lines[:,0,0]
 lidx = lambda slopes:  np.logical_and(np.isfinite(slopes), slopes<0)
 ridx = lambda slopes:  np.logical_and(np.isfinite(slopes), slopes>0)
 
-def process_image(img0, kernel_size=5, low_threshold=50, high_threshold=150, rho=2, theta=1, threshold=1, min_line_length=3, max_line_gap=1):
+def process_image(img0, kernel_size=5, low_threshold=50, high_threshold=150, rho=2, theta=1, threshold=100, min_line_length=3, max_line_gap=1):
     img1 = util.grayscale(img0)
     img2 = util.gaussian_blur(img1, kernel_size)
     img3 = util.canny(img2, low_threshold, high_threshold)
@@ -53,17 +53,16 @@ def process_image(img0, kernel_size=5, low_threshold=50, high_threshold=150, rho
     w = weight(lines)
     mbar = [np.mean(m[lidx(m)]), np.mean(m[ridx(m)])]
     bbar = [np.mean(b[lidx(m)]), np.mean(b[ridx(m)])]
-    l_pts = groundline_pts(img0, mbar[0], bbar[0])
-    r_pts = groundline_pts(img0, mbar[1], bbar[1])
+    l_pts = roadline_pts(img0, mbar[0], bbar[0])
+    r_pts = roadline_pts(img0, mbar[1], bbar[1])
     cv2.line(img7, l_pts[0], l_pts[1], (0, 255, 0), 5)
     cv2.line(img7, r_pts[0], r_pts[1], (0, 255, 0), 5)
-    return lines, m, b, mbar, bbar, l_pts, r_pts, img0, img1, img2, img3, img4, img5, img6, img7
+    return img7
 
-plt.ion()
-plt.clf()
-image = mpimg.imread('test_images/solidWhiteRight.jpg')
-lines, slopes, intercepts, mbar, bbar, l_pts, r_pts, img0, img1, img2, img3, img4, img5, img6, img7 = process_image(image)
-plt.imshow(img7)
+for f in os.listdir('test_images'):
+    image = mpimg.imread('test_images/solidWhiteRight.jpg')
+    processed_image = process_image(image)
+    mpimg.imsave("test_images/processed_%s" % f, processed_image)
 
 # white_output = 'white.mp4'
 # clip1 = VideoFileClip("solidWhiteRight.mp4")
