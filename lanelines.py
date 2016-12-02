@@ -55,7 +55,7 @@ def edge_image(img, **kwargs):
 def mask_image(img, vertices, **kwargs):
     return util.region_of_interest(img, vertices)
 
-def detect_imageP(img, **kwargs):
+def detect_image(img, **kwargs):
     lines = cv2.HoughLinesP(img, kwargs['rho'], kwargs['theta']*np.pi/180, kwargs['threshold'], np.array([]), minLineLength=kwargs['min_line_length'], maxLineGap=kwargs['max_line_gap'])
     m = slope(lines)
     b = intercept(lines, m)
@@ -77,7 +77,7 @@ def process_image(img0):
     img2 = blur_image(img1, **theta)
     img3 = edge_image(img2, **theta)
     img4 = mask_image(img3, road(image)[:,:,::-1], **theta)
-    img5, lines, slopes, intercepts = detect_imageP(img4, **theta)
+    img5, lines, slopes, intercepts = detect_image(img4, **theta)
     img6 = util.weighted_img(img5, img0)
     img7 = average_lines(img6, lines, slopes, intercepts, **theta)
     return img7
@@ -87,7 +87,7 @@ theta = {'kernel_size':5,
          'high_threshold':150,
          'rho':2,
          'theta':1,
-         'threshold':50,
+         'threshold':70,
          'min_line_length':3,
          'max_line_gap':1}
 
