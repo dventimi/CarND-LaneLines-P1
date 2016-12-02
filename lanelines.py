@@ -1,3 +1,4 @@
+# Import useful packages.
 from IPython.display import HTML
 from moviepy.editor import VideoFileClip
 import cv2
@@ -10,6 +11,11 @@ import os
 import pdb
 import util
 
+# Define function y=f(x,m,b) and inverse function x=g(y,m,b).
+y = lambda x,m,b: m*x+b
+x = lambda y,m,b: (y-b)/m
+
+# Define useful image features as functions.
 top = lambda img: 0
 bottom = lambda img: img.shape[0]
 left = lambda img: 0
@@ -27,22 +33,22 @@ sky = lambda img: np.array([[[top(img), left(img)],
                              [top(img), right(img)],
                              [bottom(img), right(img)],
                              [bottom(img), left(img)]]])
-road = lambda img:  np.array([[[horizon(img), centerline(img)-0.10*width(img)/2],
-                               [horizon(img), centerline(img)+0.10*width(img)/2],
-                               [bottom(img), centerline(img)+0.95*width(img)/2],
-                               [bottom(img), centerline(img)-0.95*width(img)/2]]]).astype(int)
-
-y = lambda x,m,b: m*x+b
-x = lambda y,m,b: (y-b)/m
-
+road = lambda img: np.array([[[horizon(img), centerline(img)-0.10*width(img)/2],
+                              [horizon(img), centerline(img)+0.10*width(img)/2],
+                              [bottom(img), centerline(img)+0.95*width(img)/2],
+                              [bottom(img), centerline(img)-0.95*width(img)/2]]]).astype(int)
 roadline_pts = lambda img,m,b: ((int(x(bottom(img),m,b)), bottom(img)),
                                 (int(x(horizon(img),m,b)), horizon(img)))
-slope = lambda lines:  (lines[:,0,3]-lines[:,0,1])/(lines[:,0,2]-lines[:,0,0])
-intercept = lambda lines, m:  lines[:,0,1]-m*lines[:,0,0]
 
-lidx = lambda slopes:  np.logical_and(np.isfinite(slopes), slopes<0)
-ridx = lambda slopes:  np.logical_and(np.isfinite(slopes), slopes>0)
+# Define functions to get slopes and y-intercepts for an array of lines.
+slope = lambda lines: (lines[:,0,3]-lines[:,0,1])/(lines[:,0,2]-lines[:,0,0])
+intercept = lambda lines, m: lines[:,0,1]-m*lines[:,0,0]
 
+# Define functions get indices into lines array, for left line and for right line.
+lidx = lambda slopes: np.logical_and(np.isfinite(slopes), slopes<0)
+ridx = lambda slopes: np.logical_and(np.isfinite(slopes), slopes>0)
+
+# Define wrapper functions that adapt parameters as keyward argument dictionaries.
 def grayscale_image(img, **kwargs):
     return util.grayscale(img)
 
@@ -72,6 +78,7 @@ def average_lines(img, lines, m, b, **kwargs):
     cv2.line(image, r_pts[0], r_pts[1], (0, 255, 0), 5)
     return image
 
+# Define processing pipeline as a function of wrapper and helper functions.
 def process_image(img0):
     img1 = grayscale_image(img0, **theta)
     img2 = blur_image(img1, **theta)
@@ -82,6 +89,7 @@ def process_image(img0):
     img7 = average_lines(img6, lines, slopes, intercepts, **theta)
     return img7
 
+# Define tuning parameters theta as a global variable.
 theta = {'kernel_size':5,
          'low_threshold':50,
          'high_threshold':150,
@@ -91,13 +99,21 @@ theta = {'kernel_size':5,
          'min_line_length':3,
          'max_line_gap':1}
 
+# Process images in the "test_images" directory.
 for path in glob.glob('test_images/solid*.jpg'):
     fname = path.split("/")[1]
     image = mpimg.imread(path)
     processed_image = process_image(image)
     mpimg.imsave("test_images/processed_%s" % fname, processed_image)
 
+# Process first test video.
 white_output = 'white.mp4'
 clip1 = VideoFileClip("solidWhiteRight.mp4")
+white_clip = clip1.fl_image(process_image)
+white_clip.write_videofile(white_output, audio=False)
+
+# Process second test video.
+white_output = 'yellow.mp4'
+clip1 = VideoFileClip("solidYellowLeft.mp4")
 white_clip = clip1.fl_image(process_image)
 white_clip.write_videofile(white_output, audio=False)
