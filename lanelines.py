@@ -17,7 +17,7 @@ x = lambda y,m,b: (y-b)/m
 
 # Define useful image features as functions.
 top = lambda img: 0
-bottom = lambda img: img.shape[0]
+bottom = lambda img: int(img.shape[0]*0.90)
 left = lambda img: 0
 right = lambda img: img.shape[1]
 width = lambda img: right(img) - left(img)
@@ -35,8 +35,8 @@ sky = lambda img: np.array([[[top(img), left(img)],
                              [bottom(img), left(img)]]])
 road = lambda img: np.array([[[horizon(img), centerline(img)-0.10*width(img)/2],
                               [horizon(img), centerline(img)+0.10*width(img)/2],
-                              [bottom(img), centerline(img)+0.95*width(img)/2],
-                              [bottom(img), centerline(img)-0.95*width(img)/2]]]).astype(int)
+                              [bottom(img), centerline(img)+0.80*width(img)/2],
+                              [bottom(img), centerline(img)-0.80*width(img)/2]]]).astype(int)
 roadline_pts = lambda img,m,b: ((int(x(bottom(img),m,b)), bottom(img)),
                                 (int(x(horizon(img),m,b)), horizon(img)))
 
@@ -45,8 +45,8 @@ slope = lambda lines: (lines[:,0,3]-lines[:,0,1])/(lines[:,0,2]-lines[:,0,0])
 intercept = lambda lines, m: lines[:,0,1]-m*lines[:,0,0]
 
 # Define functions get indices into lines array, for left line and for right line.
-lidx = lambda slopes: np.logical_and(np.isfinite(slopes), slopes<0)
-ridx = lambda slopes: np.logical_and(np.isfinite(slopes), slopes>0)
+lidx = lambda slopes: np.logical_and(np.isfinite(slopes), slopes<0, np.abs(slopes)<0.30)
+ridx = lambda slopes: np.logical_and(np.isfinite(slopes), slopes>0, np.abs(slopes)<0.30)
 
 # Define wrapper functions that adapt parameters as keyward argument dictionaries.
 def grayscale_image(img, **kwargs):
@@ -83,7 +83,7 @@ def process_image(img0):
     img1 = grayscale_image(img0, **theta)
     img2 = blur_image(img1, **theta)
     img3 = edge_image(img2, **theta)
-    img4 = mask_image(img3, road(image)[:,:,::-1], **theta)
+    img4 = mask_image(img3, road(img3)[:,:,::-1], **theta)
     img5, lines, slopes, intercepts = detect_image(img4, **theta)
     img6 = util.weighted_img(img5, img0)
     img7 = average_lines(img6, lines, slopes, intercepts, **theta)
@@ -95,7 +95,7 @@ theta = {'kernel_size':5,
          'high_threshold':150,
          'rho':2,
          'theta':1,
-         'threshold':70,
+         'threshold':40,
          'min_line_length':3,
          'max_line_gap':1}
 
@@ -115,5 +115,11 @@ white_clip.write_videofile(white_output, audio=False)
 # Process second test video.
 white_output = 'yellow.mp4'
 clip1 = VideoFileClip("solidYellowLeft.mp4")
+white_clip = clip1.fl_image(process_image)
+white_clip.write_videofile(white_output, audio=False)
+
+# Process second test video.
+white_output = 'extra.mp4'
+clip1 = VideoFileClip("challenge.mp4")
 white_clip = clip1.fl_image(process_image)
 white_clip.write_videofile(white_output, audio=False)
