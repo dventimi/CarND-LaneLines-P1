@@ -7,56 +7,65 @@ import os
 import util
 import cv2
 
+top = lambda img: 0
+bottom = lambda img: img.shape[0]
+left = lambda img: 0
+right = lambda img: img.shape[1]
+width = lambda img: right(img) - left(img)
+height = lambda img: bottom(img) - top(img)
+horizon = lambda img: int(img.shape[0]*0.60)
+centerline = lambda img: int(img.shape[1]*0.5)
+center = lambda img: [horizon(img), centerline(img)]
+ground = lambda img: np.array([[[horizon(img), left(img)],
+                                [horizon(img), right(img)],
+                                [bottom(img), right(img)],
+                                [bottom(img), left(img)]]])
+sky = lambda img: np.array([[[top(img), left(img)],
+                             [top(img), right(img)],
+                             [bottom(img), right(img)],
+                             [bottom(img), left(img)]]])
+road = lambda img:  np.array([[[horizon(img), centerline(img)-0.10*width(img)/2],
+                               [horizon(img), centerline(img)+0.10*width(img)/2],
+                               [bottom(img), centerline(img)+0.95*width(img)/2],
+                               [bottom(img), centerline(img)-0.95*width(img)/2]]]).astype(int)
+
+y = lambda x,m,b: int(m*x+b)
+x = lambda y,m,b: int((y-b)/m)
+groundline_pts = lambda img,m,b: ((x(bottom(img),m,b), bottom(img)),
+                                  (x(horizon(img),m,b), horizon(img)))
+slope = lambda lines:  (lines[:,0,3]-lines[:,0,1])/(lines[:,0,2]-lines[:,0,0])
+weight = lambda lines:  np.sqrt((lines[:,0,2]-lines[:,0,0])**2+(lines[:,0,3]-lines[:,0,1])**2)
+intercept = lambda lines, m:  lines[:,0,1]-m*lines[:,0,0]
+
+lidx = lambda slopes:  np.logical_and(np.isfinite(slopes), slopes<0)
+ridx = lambda slopes:  np.logical_and(np.isfinite(slopes), slopes>0)
+
+def process_image(img0, kernel_size=5, low_threshold=50, high_threshold=150, rho=2, theta=1, threshold=1, min_line_length=3, max_line_gap=1):
+    img1 = util.grayscale(img0)
+    img2 = util.gaussian_blur(img1, kernel_size)
+    img3 = util.canny(img2, low_threshold, high_threshold)
+    img4 = util.region_of_interest(img3, road(img0)[:,:,::-1])
+    img5, lines = util.hough_lines(img4, rho, theta*np.pi/180, threshold, min_line_length, max_line_gap)
+    img6 = util.weighted_img(img5, img0)
+    img7 = np.copy(img6)
+    m = slope(lines)
+    b = intercept(lines, m)
+    w = weight(lines)
+    mbar = [np.mean(m[lidx(m)]), np.mean(m[ridx(m)])]
+    bbar = [np.mean(b[lidx(m)]), np.mean(b[ridx(m)])]
+    l_pts = groundline_pts(img0, mbar[0], bbar[0])
+    r_pts = groundline_pts(img0, mbar[1], bbar[1])
+    cv2.line(img7, l_pts[0], l_pts[1], (0, 255, 0), 5)
+    cv2.line(img7, r_pts[0], r_pts[1], (0, 255, 0), 5)
+    return lines, m, b, mbar, bbar, l_pts, r_pts, img0, img1, img2, img3, img4, img5, img6, img7
+
 plt.ion()
-
 plt.clf()
-
 image = mpimg.imread('test_images/solidWhiteRight.jpg')
-         
-def process_image(image):
-    kernel_size = 5
-    low_threshold = 50
-    high_threshold = 150
-    rho = 1
-    theta = np.pi/180
-    threshold = 1
-    min_line_length = 10
-    max_line_gap = 1
-    
-    grayed = util.grayscale(image)
-    blurred = util.gaussian_blur(grayed, kernel_size)
-    edged = util.canny(blurred, low_threshold, high_threshold)
-    mask = np.array([[[0, image.shape[0]],
-                      [image.shape[1], image.shape[0]],
-                      [image.shape[1]*0.5, image.shape[0]*0.50]]]).astype(int)
+lines, slopes, intercepts, mbar, bbar, l_pts, r_pts, img0, img1, img2, img3, img4, img5, img6, img7 = process_image(image)
+plt.imshow(img7)
 
-    masked = util.region_of_interest(edged, mask)
-    detected, lines = util.hough_lines(masked, rho, theta, threshold, min_line_length, max_line_gap)
-    lines2 = cv2.HoughLines(masked, rho, theta, threshold, min_line_length, max_line_gap)
-    weighted = util.weighted_img(detected, image)
-    slopes = (lines[:,0,3]-lines[:,0,1])/(lines[:,0,2]-lines[:,0,0])
-    weights = np.sqrt((lines[:,0,2]-lines[:,0,0])**2+(lines[:,0,3]-lines[:,0,1])**2)
-    l_idx = np.logical_and(np.isfinite(slopes), slopes<0)
-    r_idx = np.logical_and(np.isfinite(slopes), slopes>0)
-    idx = np.logical_or(l_idx, r_idx)
-    l_m = np.average(slopes[l_idx], weights=weights[l_idx])
-    r_m = np.average(slopes[r_idx], weights=weights[r_idx])
-    l_b = np.average(lines[l_idx,0,1]-slopes[l_idx]*lines[l_idx,0,0], weights=weights[l_idx])
-    r_b = np.average(lines[r_idx,0,1]-slopes[r_idx]*lines[r_idx,0,0], weights=weights[r_idx])
-    l_0 = (int((image.shape[0]-l_b)/l_m), int(image.shape[0]))
-    l_1 = (int((image.shape[0]*0.5-l_b)/l_m), int(image.shape[0]*0.5))
-    r_0 = (int((image.shape[0]-r_b)/r_m), int(image.shape[0]))
-    r_1 = (int((image.shape[0]*0.5-r_b)/r_m), int(image.shape[0]*0.5))
-    lined = cv2.line(cv2.line(image, l_0, l_1, (255, 0, 0), 5), r_0, r_1, (255, 0, 0), 5)
-    return lined
-
-lined = process_image(image)
-
-plt.imshow(lined)
-
-white_output = 'white.mp4'
-clip1 = VideoFileClip("solidWhiteRight.mp4")
-white_clip = clip1.fl_image(process_image)
-white_clip.write_videofile(white_output, audio=False)
-
-
+# white_output = 'white.mp4'
+# clip1 = VideoFileClip("solidWhiteRight.mp4")
+# white_clip = clip1.fl_image(process_image)
+# white_clip.write_videofile(white_output, audio=False)
