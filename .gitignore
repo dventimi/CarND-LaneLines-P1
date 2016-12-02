@@ -1,3 +1,4 @@
 .ipynb_checkpoints
 __pycache__
 white.mp4
+test_images/processed_*.jpg
