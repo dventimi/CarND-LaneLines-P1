@@ -105,12 +105,13 @@ x = lambda y,m,b: (y-b)/m
 
 # Define useful image features as functions.
 top = lambda img: 0
-bottom = lambda img: int(img.shape[0]*0.90)
+bottom = lambda img: int(img.shape[0])
+hood = lambda img: bottom(img)*(1-theta['hood'])
 left = lambda img: 0
 right = lambda img: img.shape[1]
 width = lambda img: right(img) - left(img)
 height = lambda img: bottom(img) - top(img)
-horizon = lambda img: int(img.shape[0]*0.60)
+horizon = lambda img: int(img.shape[0]*theta['horizon'])
 centerline = lambda img: int(img.shape[1]*0.5)
 center = lambda img: [horizon(img), centerline(img)]
 ground = lambda img: np.array([[[horizon(img), left(img)],
@@ -121,20 +122,20 @@ sky = lambda img: np.array([[[top(img), left(img)],
                              [top(img), right(img)],
                              [bottom(img), right(img)],
                              [bottom(img), left(img)]]])
-road = lambda img: np.array([[[horizon(img), centerline(img)-0.10*width(img)/2],
-                              [horizon(img), centerline(img)+0.10*width(img)/2],
-                              [bottom(img), centerline(img)+0.80*width(img)/2],
-                              [bottom(img), centerline(img)-0.80*width(img)/2]]]).astype(int)
-roadline_pts = lambda img,m,b: ((int(x(bottom(img),m,b)), bottom(img)),
-                                (int(x(horizon(img),m,b)), horizon(img)))
+trapezoid = lambda img: np.array([[[horizon(img), centerline(img)-theta['trapezoid_top_factor']*width(img)/2],
+                                   [horizon(img), centerline(img)+theta['trapezoid_top_factor']*width(img)/2],
+                                   [hood(img), centerline(img)+theta['trapezoid_bottom_factor']*width(img)/2],
+                                   [hood(img), centerline(img)-theta['trapezoid_bottom_factor']*width(img)/2]]]).astype(int)
+trapezoid_pts = lambda img,m,b: ((int(x(hood(img),m,b)), int(hood(img))),
+                                 (int(x(horizon(img),m,b)), int(horizon(img))))
 
 # Define functions to get slopes and y-intercepts for an array of lines.
 slope = lambda lines: (lines[:,0,3]-lines[:,0,1])/(lines[:,0,2]-lines[:,0,0])
 intercept = lambda lines, m: lines[:,0,1]-m*lines[:,0,0]
 
 # Define functions get indices into lines array, for left line and for right line.
-lidx = lambda slopes: np.logical_and(np.isfinite(slopes), slopes<0, np.abs(slopes)<0.30)
-ridx = lambda slopes: np.logical_and(np.isfinite(slopes), slopes>0, np.abs(slopes)<0.30)
+lidx = lambda slopes: np.logical_and(np.isfinite(slopes), slopes<0, np.abs(slopes)>math.tan(theta['angle_cutoff']))
+ridx = lambda slopes: np.logical_and(np.isfinite(slopes), slopes>0, np.abs(slopes)>math.tan(theta['angle_cutoff']))
 
 # Define wrapper functions that adapt the Udacity helper functions.
 # Note that they adapt keyword parameters into named args.
@@ -161,25 +162,48 @@ def average_lines(img, lines, m, b):
     image = np.copy(img)
     mbar = [np.mean(m[lidx(m)]), np.mean(m[ridx(m)])]
     bbar = [np.mean(b[lidx(m)]), np.mean(b[ridx(m)])]
-    l_pts = roadline_pts(img, mbar[0], bbar[0])
-    r_pts = roadline_pts(img, mbar[1], bbar[1])
+    l_pts = trapezoid_pts(img, mbar[0], bbar[0])
+    r_pts = trapezoid_pts(img, mbar[1], bbar[1])
     cv2.line(image, l_pts[0], l_pts[1], (0, 255, 0), 5)
     cv2.line(image, r_pts[0], r_pts[1], (0, 255, 0), 5)
     return image
 
-# Define processing pipeline as a function of wrapper and helper functions.
-def process_image(img0):
+def detect_lines(img):
     img1 = grayscale_image(img0)
     img2 = blur_image(img1)
     img3 = edge_image(img2)
-    img4 = mask_image(img3, road(img3)[:,:,::-1])
+    img4 = mask_image(img3, trapezoid(img3)[:,:,::-1])
+    img5, lines, slopes, intercepts = detect_image(img4)
+
+# Top-Level functions
+
+def process_image1(img0):
+    img1 = grayscale_image(img0)
+    img2 = blur_image(img1)
+    img3 = edge_image(img2)
+    img4 = mask_image(img3, trapezoid(img3)[:,:,::-1])
     img5, lines, slopes, intercepts = detect_image(img4)
     img6 = weighted_img(img5, img0)
-    img7 = average_lines(img6, lines, slopes, intercepts)
-    return img7
+    return img6
 
-# Define tuning parameters theta as a global variable.
-theta = {'kernel_size':5,
+def process_image2(img0):
+    img1 = grayscale_image(img0)
+    img2 = blur_image(img1)
+    img3 = edge_image(img2)
+    img4 = mask_image(img3, trapezoid(img3)[:,:,::-1])
+    img5, lines, slopes, intercepts = detect_image(img4)
+    img6 = average_lines(img0, lines, slopes, intercepts)
+    # img7 = weighted_img(img6, img0)
+    return img6
+
+# Parameters for part 1
+
+theta = {'horizon':0.60,
+         'hood':0.0,
+         'trapezoid_top_factor':0.10,
+         'trapezoid_bottom_factor':0.90,
+         'angle_cutoff':0.45,
+         'kernel_size':5,
          'low_threshold':50,
          'high_threshold':150,
          'rho':2,
@@ -192,23 +216,39 @@ theta = {'kernel_size':5,
 for path in glob.glob('test_images/solid*.jpg'):
     fname = path.split("/")[1]
     image = mpimg.imread(path)
-    processed_image = process_image(image)
+    processed_image = process_image1(image)
     mpimg.imsave("test_images/processed_%s" % fname, processed_image)
 
-# # Process first test video.
-# white_output = 'white.mp4'
-# clip1 = VideoFileClip("solidWhiteRight.mp4")
-# white_clip = clip1.fl_image(process_image)
-# white_clip.write_videofile(white_output, audio=False)
+# Process first test video.
+white_output = 'white.mp4'
+clip1 = VideoFileClip("solidWhiteRight.mp4")
+white_clip = clip1.fl_image(process_image2)
+white_clip.write_videofile(white_output, audio=False)
 
-# # Process second test video.
-# yellow_output = 'yellow.mp4'
-# clip1 = VideoFileClip("solidYellowLeft.mp4")
-# yellow_clip = clip1.fl_image(process_image)
-# yellow_clip.write_videofile(yellow_output, audio=False)
+# Process second test video.
+yellow_output = 'yellow.mp4'
+clip1 = VideoFileClip("solidYellowLeft.mp4")
+yellow_clip = clip1.fl_image(process_image2)
+yellow_clip.write_videofile(yellow_output, audio=False)
 
-# # Process challenge video.
-# challenge_output = 'extra.mp4'
-# clip1 = VideoFileClip("challenge.mp4")
-# challenge_clip = clip1.fl_image(process_image)
-# challenge_clip.write_videofile(challenge_output, audio=False)
+# Parameters for part 2 (challenge)
+
+theta = {'horizon':0.61,
+         'hood':0.07,
+         'trapezoid_top_factor':0.10,
+         'trapezoid_bottom_factor':0.90,
+         'angle_cutoff':0.75,
+         'kernel_size':5,
+         'low_threshold':50,
+         'high_threshold':150,
+         'rho':2,
+         'theta':1,
+         'threshold':30,
+         'min_line_length':3,
+         'max_line_gap':1}
+
+# Process challenge video.
+challenge_output = 'extra.mp4'
+clip1 = VideoFileClip("challenge.mp4")
+challenge_clip = clip1.fl_image(process_image2)
+challenge_clip.write_videofile(challenge_output, audio=False)
