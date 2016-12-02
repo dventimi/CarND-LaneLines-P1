@@ -9,7 +9,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 import pdb
-import util
 
 # Udacity helper functions
 def grayscale(img):
@@ -139,26 +138,26 @@ ridx = lambda slopes: np.logical_and(np.isfinite(slopes), slopes>0, np.abs(slope
 
 # Define wrapper functions that adapt the Udacity helper functions.
 # Note that they adapt keyword parameters into named args.
-def grayscale_image(img, **kwargs):
+def grayscale_image(img):
     return grayscale(img)
 
-def blur_image(img, **kwargs):
-    return gaussian_blur(img, kwargs['kernel_size'])
+def blur_image(img):
+    return gaussian_blur(img, theta['kernel_size'])
 
-def edge_image(img, **kwargs):
-    return canny(img, kwargs['low_threshold'], kwargs['high_threshold'])
+def edge_image(img):
+    return canny(img, theta['low_threshold'], theta['high_threshold'])
 
-def mask_image(img, vertices, **kwargs):
+def mask_image(img, vertices):
     return region_of_interest(img, vertices)
 
-def detect_image(img, **kwargs):
-    lines = cv2.HoughLinesP(img, kwargs['rho'], kwargs['theta']*np.pi/180, kwargs['threshold'], np.array([]), minLineLength=kwargs['min_line_length'], maxLineGap=kwargs['max_line_gap'])
+def detect_image(img):
+    lines = cv2.HoughLinesP(img, theta['rho'], theta['theta']*np.pi/180, theta['threshold'], np.array([]), minLineLength=theta['min_line_length'], maxLineGap=theta['max_line_gap'])
     m = slope(lines)
     b = intercept(lines, m)
-    image = hough_lines(img, kwargs['rho'], kwargs['theta']*np.pi/180, kwargs['threshold'], kwargs['min_line_length'], kwargs['max_line_gap'])
+    image = hough_lines(img, theta['rho'], theta['theta']*np.pi/180, theta['threshold'], theta['min_line_length'], theta['max_line_gap'])
     return image, lines, m, b
 
-def average_lines(img, lines, m, b, **kwargs):
+def average_lines(img, lines, m, b):
     image = np.copy(img)
     mbar = [np.mean(m[lidx(m)]), np.mean(m[ridx(m)])]
     bbar = [np.mean(b[lidx(m)]), np.mean(b[ridx(m)])]
@@ -170,13 +169,13 @@ def average_lines(img, lines, m, b, **kwargs):
 
 # Define processing pipeline as a function of wrapper and helper functions.
 def process_image(img0):
-    img1 = grayscale_image(img0, **theta)
-    img2 = blur_image(img1, **theta)
-    img3 = edge_image(img2, **theta)
-    img4 = mask_image(img3, road(img3)[:,:,::-1], **theta)
-    img5, lines, slopes, intercepts = detect_image(img4, **theta)
+    img1 = grayscale_image(img0)
+    img2 = blur_image(img1)
+    img3 = edge_image(img2)
+    img4 = mask_image(img3, road(img3)[:,:,::-1])
+    img5, lines, slopes, intercepts = detect_image(img4)
     img6 = weighted_img(img5, img0)
-    img7 = average_lines(img6, lines, slopes, intercepts, **theta)
+    img7 = average_lines(img6, lines, slopes, intercepts)
     return img7
 
 # Define tuning parameters theta as a global variable.
@@ -196,20 +195,20 @@ for path in glob.glob('test_images/solid*.jpg'):
     processed_image = process_image(image)
     mpimg.imsave("test_images/processed_%s" % fname, processed_image)
 
-# Process first test video.
-white_output = 'white.mp4'
-clip1 = VideoFileClip("solidWhiteRight.mp4")
-white_clip = clip1.fl_image(process_image)
-white_clip.write_videofile(white_output, audio=False)
+# # Process first test video.
+# white_output = 'white.mp4'
+# clip1 = VideoFileClip("solidWhiteRight.mp4")
+# white_clip = clip1.fl_image(process_image)
+# white_clip.write_videofile(white_output, audio=False)
 
-# Process second test video.
-yellow_output = 'yellow.mp4'
-clip1 = VideoFileClip("solidYellowLeft.mp4")
-yellow_clip = clip1.fl_image(process_image)
-yellow_clip.write_videofile(yellow_output, audio=False)
+# # Process second test video.
+# yellow_output = 'yellow.mp4'
+# clip1 = VideoFileClip("solidYellowLeft.mp4")
+# yellow_clip = clip1.fl_image(process_image)
+# yellow_clip.write_videofile(yellow_output, audio=False)
 
-# Process challenge video.
-challenge_output = 'extra.mp4'
-clip1 = VideoFileClip("challenge.mp4")
-challenge_clip = clip1.fl_image(process_image)
-challenge_clip.write_videofile(challenge_output, audio=False)
+# # Process challenge video.
+# challenge_output = 'extra.mp4'
+# clip1 = VideoFileClip("challenge.mp4")
+# challenge_clip = clip1.fl_image(process_image)
+# challenge_clip.write_videofile(challenge_output, audio=False)
