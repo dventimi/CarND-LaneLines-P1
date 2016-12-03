@@ -138,7 +138,6 @@ lidx = lambda slopes: np.logical_and(np.isfinite(slopes), slopes<0, np.abs(slope
 ridx = lambda slopes: np.logical_and(np.isfinite(slopes), slopes>0, np.abs(slopes)>math.tan(theta['angle_cutoff']))
 
 # Define wrapper functions that adapt the Udacity helper functions.
-# Note that they adapt keyword parameters into named args.
 def grayscale_image(img):
     return grayscale(img)
 
@@ -193,7 +192,6 @@ def process_image2(img0):
     img4 = mask_image(img3, trapezoid(img3)[:,:,::-1])
     img5, lines, slopes, intercepts = detect_image(img4)
     img6 = average_lines(img0, lines, slopes, intercepts)
-    # img7 = weighted_img(img6, img0)
     return img6
 
 # Parameters for part 1
